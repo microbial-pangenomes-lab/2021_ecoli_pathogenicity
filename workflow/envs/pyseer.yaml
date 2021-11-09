@@ -1,0 +1,8 @@
+channels:
+ - bioconda
+dependencies:
+ - python
+ - pybedtools
+ - biopython
+ - statsmodels >=0.10
+ - pyseer=1.3.6

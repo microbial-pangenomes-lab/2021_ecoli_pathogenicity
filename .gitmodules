@@ -1,0 +1,6 @@
+[submodule "BacGWASim"]
+	path = BacGWASim
+	url = git@github.com:microbial-pangenomes-lab/BacGWASim.git
+[submodule "albi"]
+	path = albi
+	url = git@github.com:cozygene/albi.git

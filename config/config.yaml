@@ -1,0 +1,126 @@
+##### params #####
+
+# references fopr SNPs mapping
+references: ["ED1a", "IAI1", "IAI39", "K-12", "UMN026", "UTI89", "CFT073", "536"]
+
+# targets for associations
+targets: ["choc", "passage_en_rea", "deces", "pe_urinaire", "pe_digestive", "pe_pulmonaire", "pe_cutanee", "pe_kt", "pe_chir", "pe_gyneco"]
+targets_wg: ["choc", "passage_en_rea", "deces", "pe_urinaire", "pe_digestive"]
+covariates: 
+        choc: "5q 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29"
+        passage_en_rea: "5q 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29"
+        deces: "5q 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29"
+        pe_urinaire: "5q 6 7 8 9 10 11 12 13 14 15 16 17 25 26 27 28 29"
+        pe_digestive: "5q 6 7 8 9 10 11 12 13 14 15 16 17 25 26 27 28 29"
+        pe_pulmonaire: "5q 6 7 8 9 10 11 12 13 14 15 16 17 25 26 27 28 29"
+        pe_cutanee: "5q 6 7 8 9 10 11 12 13 14 15 16 17 25 26 27 28 29"
+        pe_kt: "5q 6 7 8 9 10 11 12 13 14 15 16 17 25 26 27 28 29"
+        pe_chir: "5q 6 7 8 9 10 11 12 13 14 15 16 17 25 26 27 28 29"
+        pe_gyneco: "5q 6 7 8 9 10 11 12 13 14 15 16 17 25 26 27 28 29"
+
+# simulations
+simulations: [1, 2] 
+
+##### inputs (there already) #####
+
+# samples file
+# (includes phenotypes)
+samples: "data/GWAS_20201217_MEO.csv"
+
+# genomes
+fastas: "data/fastas"
+fixed_fastas: "data/fixed_fastas"
+gffs: "data/gffs"
+
+# pregenerated tree
+tree: "data/Septi_Colibafi_95.iqtree.treefile"
+
+# typing and phylogroup
+typing: "data/Strain_typing.csv"
+
+# eggnog-mapper
+# path to eggnog-mapper data directory
+# note: can also be a symbolic link
+emapper: "data/eggnog-mapper"
+
+# references
+panaroo_ref_input: "data/panaroo_ref_input.txt"
+# snpeff
+snpeff: "config/snpeff.config"
+references_dir: "data/references"
+snps_reference: "data/references/IAI39/IAI39.gbk"
+snps_reference_gff: "data/references/IAI39/IAI39.gff"
+snps_reference_faa: "data/references/IAI39/IAI39.faa"
+# path to uniref50 unzipped fasta file
+# note: can also be a symbolic link
+uniref50: "data/uniref50.fasta"
+
+# simulations
+sim_1_config: "config/bacgwasim_1.yaml"
+sim_2_config: "config/bacgwasim_2.yaml"
+
+##### outputs #####
+
+### clinical data
+clinical: "out/clinical.tsv"
+clinical_reduced: "out/clinical_reduced.tsv"
+clinical_full: "out/clinical_full.tsv"
+clinical_imputed: "out/clinical_imputed.tsv"
+
+### lineages
+lineage: "out/lineages.tsv"
+
+### unitigs
+# generated outside the workflow
+unitigs_input: "out/unitigs_input.tsv"
+# 
+unitigs_dir: "out/unitigs"
+unitigs: "out/unitigs/unitigs.txt"
+unitigs_rtab: "out/unitigs/unitigs.unique_rows.Rtab"
+
+### pangenome (panaroo)
+# generated outside the workflow
+panaroo_input: "out/panaroo_input.txt"
+#
+panaroo_dir: "out/panaroo"
+pangenome: "out/panaroo/gene_presence_absence.Rtab"
+pangenome_roary: "out/panaroo/gene_presence_absence_roary.csv"
+pangenome_genes: "out/panaroo/gene_data.csv"
+structural: "out/panaroo/struct_presence_absence.Rtab"
+
+### pangenome / references (panaroo)
+panaroo_ref_dir: "out/panaroo_ref"
+pangenome_ref: "out/panaroo_ref/gene_presence_absence.Rtab"
+pangenome_ref_roary: "out/panaroo_ref/gene_presence_absence_roary.csv"
+
+### distance (mash)
+# generated outside the workflow
+mash_input: "out/mash_input.txt"
+#
+sketches_base: "out/sketches"
+sketches: "out/sketches.msh"
+distances: "out/distances.tsv"
+
+### similarity
+similarities: "out/similarity.tsv"
+
+### rare variants
+rare_snps: "out/snps/rare.vcf.gz"
+regions: "out/snps/regions.tsv"
+sift: "out/snps/sift"
+
+### poppunk lineages
+# generated outside the workflow
+poppunk_input: "out/poppunk_input.txt"
+#
+poppunk_db: "data/ecoli_poppunk_db"
+poppunk_dir: "out/poppunk"
+poppunk: "out/poppunk.tsv"
+
+### univariate analysis
+univariate_dir: "out/clinical_associations/"
+univariate: "out/clinical_associations/univariate.tsv"
+
+### associations
+association_inputs: "out/associations/inputs"
+wg_inputs: "out/wg/inputs"

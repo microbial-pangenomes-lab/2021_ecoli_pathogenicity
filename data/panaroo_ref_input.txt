@@ -1,0 +1,8 @@
+data/references/ED1a/ED1a.gff
+data/references/IAI1/IAI1.gff
+data/references/IAI39/IAI39.gff
+data/references/K-12/K-12.gff
+data/references/UMN026/UMN026.gff
+data/references/UTI89/UTI89.gff
+data/references/536/536.gff
+data/references/CFT073/CFT073.gff
