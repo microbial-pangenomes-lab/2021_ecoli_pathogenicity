@@ -5,7 +5,7 @@ _E. coli_ bloodstream infections. Given the sensitive information used as
 covariates in this analysis, users wishing to replicate this study should
 generate the data contained in the missing `data/GWAS_20201217_MEO.csv`
 file. Summary statistics about each variable can be found as supplementary
-material in the preprint (to be available soon).
+material in the [preprint](https://www.medrxiv.org/content/10.1101/2021.11.09.21266136v1.full-text).
 
 ## Input genomes
 
