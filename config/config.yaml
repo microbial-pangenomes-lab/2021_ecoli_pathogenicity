@@ -4,7 +4,7 @@
 references: ["ED1a", "IAI1", "IAI39", "K-12", "UMN026", "UTI89", "CFT073", "536"]
 
 # targets for associations
-targets: ["choc", "passage_en_rea", "deces", "pe_urinaire", "pe_digestive", "pe_pulmonaire", "pe_cutanee", "pe_kt", "pe_chir", "pe_gyneco"]
+targets: ["choc", "passage_en_rea", "deces", "pe_urinaire", "pe_digestive"]
 targets_wg: ["choc", "passage_en_rea", "deces", "pe_urinaire", "pe_digestive"]
 covariates: 
         choc: "5q 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29"
@@ -37,6 +37,7 @@ tree: "data/Septi_Colibafi_95.iqtree.treefile"
 
 # typing and phylogroup
 typing: "data/Strain_typing.csv"
+B2_input: "data/B2.tsv"
 
 # eggnog-mapper
 # path to eggnog-mapper data directory
@@ -124,3 +125,8 @@ univariate: "out/clinical_associations/univariate.tsv"
 ### associations
 association_inputs: "out/associations/inputs"
 wg_inputs: "out/wg/inputs"
+B2_inputs: "out/B2/inputs"
+
+### re-rooted tree
+rerooted_dir: "figures/itol_all"
+rerooted: "figures/itol_all/rerooted.nwk"

@@ -80,12 +80,14 @@ rule distance:
     "mash dist -p {threads} {input} {input} | square_mash > {output}"
 
 rule similarity:
-  input: config["tree"]
-  output: config["similarities"]
-  conda: "../envs/pyseer.yaml"
-  log: "out/logs/similarity.log"
+  input:
+    config["clinical_imputed"],
+    config["unitigs"]
+  output:
+    config["similarities"]
+  log: "out/logs/unitigs2covariance.log"
   shell:
-    "python3 workflow/scripts/phylogeny_distance.py --calc-C {input} > {output}"
+    "python workflow/scripts/unitigs2covar.py {input} --sample 0.05 > {output}"
 
 rule pangenome:
   input: config["panaroo_input"]
@@ -169,6 +171,41 @@ rule prepare_pyseer:
   log: "out/logs/prepare_pyseer.log"
   shell:
     "python3 workflow/scripts/prepare_pyseer.py {input} {params}"
+
+rule prepare_pyseer_B2:
+  input:
+    variants=config["unitigs_input"],
+    phenotypes=config["clinical_imputed"],
+    similarity=config["similarities"],
+    distances=config["distances"],
+    lineage=config["B2_input"]
+  output:
+    phenotypes=os.path.join(config["B2_inputs"], "phenotypes.tsv"),
+    similarity=os.path.join(config["B2_inputs"], "similarity.tsv"),
+    distances=os.path.join(config["B2_inputs"], "distances.tsv")
+  params: config["B2_inputs"]
+  log: "out/logs/prepare_pyseer_B2.log"
+  shell:
+    """
+    python3 workflow/scripts/prepare_pyseer.py {input} {params}
+    """
+
+rule reroot:
+  input:
+    config["tree"],
+    config["clinical_imputed"],
+    config["lineage"],
+    config["poppunk"]
+  output:
+    config["rerooted"]
+  params: config["rerooted_dir"]
+  log: "out/logs/reroot.log"
+  conda: "../envs/pyseer.yaml"
+  shell:
+    """
+    cd {params} && \
+    python3 workflow/scripts/prepare_itol.py {input}
+    """
 
 rule sift:
   input: config["snps_reference_faa"]
@@ -254,15 +291,6 @@ rule heritability:
            target=config["targets"]),
     expand('out/associations/{target}/heritability.ci.tsv',
            target=config["targets"]),
-
-rule unitigs2covariance:
-  input:
-    config["unitigs_rtab"]
-  output:
-    os.path.join(config["association_inputs"], "unitigs_covariance.tsv")
-  log: "out/logs/unitigs2covariance.log"
-  shell:
-    "python workflow/scripts/unitigs2covar.py {input} > {output}"
 
 rule lineages2covariance:
   input:
@@ -422,6 +450,11 @@ rule pyseer:
     expand('out/associations/{target}/unitigs_filtered.tsv',
            target=config["targets"])
 
+rule pyseer_B2:
+  input:
+    expand('out/B2/{target}/unitigs_filtered.tsv',
+           target=config["targets"])
+
 rule pyseer_rare:
   input:
     expand('out/associations/{target}/rare_filtered.tsv',
@@ -455,6 +488,19 @@ rule run_pyseer:
   log: "out/logs/pyseer_{target}.log"
   shell:
     """
+    head -n 10 {input.unitigs} > /tmp/{wildcards.target}.txt && \
+    pyseer --phenotypes {input.phenotypes} \
+           --phenotype-column {wildcards.target} \
+           --kmers /tmp/{wildcards.target}.txt \
+           --similarity {input.similarity} \
+           --lmm --uncompressed \
+           --covariates {input.phenotypes} \
+           --use-covariates {params.covariates} \
+           --cpu {threads} \
+           --lineage --lineage-clusters {input.lineages} \
+           --lineage-file out/associations/{wildcards.target}/unitigs_lineage.txt \
+           --distances {input.distances} \
+           > {output.unitigs} && \
     pyseer --phenotypes {input.phenotypes} \
            --phenotype-column {wildcards.target} \
            --kmers {input.unitigs} \
@@ -464,9 +510,6 @@ rule run_pyseer:
            --use-covariates {params.covariates} \
            --output-patterns out/associations/{wildcards.target}/unitigs_patterns.txt \
            --cpu {threads} \
-           --lineage --lineage-clusters {input.lineages} \
-           --lineage-file out/associations/{wildcards.target}/unitigs_lineage.txt \
-           --distances {input.distances} \
            > {output.unitigs} && \
     cat <(head -1 {output.unitigs}) <(LC_ALL=C awk -v pval=$(python workflow/scripts/count_patterns.py --threshold out/associations/{wildcards.target}/unitigs_patterns.txt) '$4<pval {{print $0}}' {output.unitigs}) > {output.unitigs_f}
     pyseer --phenotypes {input.phenotypes} \
@@ -478,9 +521,6 @@ rule run_pyseer:
            --use-covariates {params.covariates} \
            --output-patterns out/associations/{wildcards.target}/gpa_patterns.txt \
            --cpu {threads} \
-           --lineage --lineage-clusters {input.lineages} \
-           --lineage-file out/associations/{wildcards.target}/gpa_lineage.txt \
-           --distances {input.distances} \
            > {output.gpa} && \
     cat <(head -1 {output.gpa}) <(LC_ALL=C awk -v pval=$(python workflow/scripts/count_patterns.py --threshold out/associations/{wildcards.target}/gpa_patterns.txt) '$4<pval {{print $0}}' {output.gpa}) > {output.gpa_f}
     pyseer --phenotypes {input.phenotypes} \
@@ -492,11 +532,36 @@ rule run_pyseer:
            --use-covariates {params.covariates} \
            --output-patterns out/associations/{wildcards.target}/struct_patterns.txt \
            --cpu {threads} \
-           --lineage --lineage-clusters {input.lineages} \
-           --lineage-file out/associations/{wildcards.target}/struct_lineage.txt \
-           --distances {input.distances} \
            > {output.struct} && \
     cat <(head -1 {output.struct}) <(LC_ALL=C awk -v pval=$(python workflow/scripts/count_patterns.py --threshold out/associations/{wildcards.target}/struct_patterns.txt) '$4<pval {{print $0}}' {output.struct}) > {output.struct_f}
+    """
+
+rule run_pyseer_B2:
+  input:
+    unitigs=config["unitigs"],
+    phenotypes=os.path.join(config["B2_inputs"], "phenotypes.tsv"),
+    similarity=os.path.join(config["B2_inputs"], "similarity.tsv")
+  output:
+    unitigs="out/B2/{target}/unitigs.tsv",
+    unitigs_f="out/B2/{target}/unitigs_filtered.tsv",
+  params:
+    covariates=lambda wildcards: config["covariates"][wildcards.target]    
+  threads: 2
+  conda: "../envs/pyseer.yaml"
+  log: "out/logs/pyseer_B2_{target}.log"
+  shell:
+    """
+    pyseer --phenotypes {input.phenotypes} \
+           --phenotype-column {wildcards.target} \
+           --kmers {input.unitigs} \
+           --similarity {input.similarity} \
+           --lmm --uncompressed \
+           --covariates {input.phenotypes} \
+           --use-covariates {params.covariates} \
+           --output-patterns out/B2/{wildcards.target}/unitigs_patterns.txt \
+           --cpu {threads} \
+           > {output.unitigs} && \
+    cat <(head -1 {output.unitigs}) <(LC_ALL=C awk -v pval=$(python workflow/scripts/count_patterns.py --threshold out/B2/{wildcards.target}/unitigs_patterns.txt) '$4<pval {{print $0}}' {output.unitigs}) > {output.unitigs_f}
     """
 
 rule run_pyseer_rare:
@@ -536,8 +601,6 @@ rule run_pyseer_nc:
     struct=config["structural"],
     phenotypes=os.path.join(config["association_inputs"], "phenotypes.tsv"),
     similarity=os.path.join(config["association_inputs"], "similarity.tsv"),
-    distances=os.path.join(config["association_inputs"], "distances.tsv"),
-    lineages=os.path.join(config["association_inputs"], "lineages.tsv")
   output:
     unitigs="out/associations/{target}/nc_unitigs.tsv",
     unitigs_f="out/associations/{target}/nc_unitigs_filtered.tsv",
@@ -564,9 +627,6 @@ rule run_pyseer_nc:
            --pres {input.gpa} \
            --similarity {input.similarity} \
            --lmm --uncompressed \
-           --lineage --lineage-clusters {input.lineages} \
-           --lineage-file out/associations/{wildcards.target}/nc_lineage.txt \
-           --distances {input.distances} \
            --output-patterns out/associations/{wildcards.target}/nc_gpa_patterns.txt \
            --cpu {threads} \
            > {output.gpa} && \
@@ -589,6 +649,36 @@ rule map_back:
            sample=_read_samples(config["unitigs_input"]))
   output:
     "out/associations/mapped.done"
+  shell:
+    "touch {output}"
+
+rule map_back_B2:
+  input:
+    expand("out/B2/{target}/mapped/{sample}.txt",
+           target=config["targets"],
+           sample=_read_samples(config["B2_input"]))
+  output:
+    "out/B2/mapped.done"
+  shell:
+    "touch {output}"
+
+rule map_back_reference:
+  input:
+    expand("out/associations/{target}/mapped_reference/{reference}.txt",
+           target=config["targets"],
+           reference=config["references"])
+  output:
+    "out/associations/mapped_reference.done"
+  shell:
+    "touch {output}"
+
+rule map_back_B2_reference:
+  input:
+    expand("out/B2/{target}/mapped_reference/{reference}.txt",
+           target=config["targets"],
+           reference=config["references"])
+  output:
+    "out/B2/mapped_reference.done"
   shell:
     "touch {output}"
 
@@ -620,6 +710,58 @@ rule run_map_back:
     python workflow/scripts/map_back.py {input.passing} {input.fasta} --tmp-prefix {params} --gff {input.gff} --print-details --roary {input.pangenome} > {output}
     """
 
+rule run_map_back_B2:
+  input:
+    passing="out/B2/{target}/unitigs_filtered.tsv",
+    fasta=os.path.join(config["fixed_fastas"], "{sample}.fasta"),
+    gff=os.path.join(config["gffs"], "{sample}.gff"),
+    pangenome=config["pangenome_roary"]
+  output:
+    "out/B2/{target}/mapped/{sample}.txt"
+  params:
+    "/tmp/map_back_B2_{target}_{sample}"
+  conda: "../envs/pyseer.yaml"
+  log: "out/logs/map_back_B2_{target}_{sample}.log"
+  shell:
+    """
+    mkdir -p {params} && \
+    python workflow/scripts/map_back.py {input.passing} {input.fasta} --tmp-prefix {params} --gff {input.gff} --print-details --roary {input.pangenome} > {output}
+    """
+
+rule run_map_back_reference:
+  input:
+    passing="out/associations/{target}/unitigs.tsv",
+    fasta=os.path.join(config["references_dir"], "{reference}", "{reference}.fna"),
+    gff=os.path.join(config["references_dir"], "{reference}", "{reference}.gff"),
+  output:
+    "out/associations/{target}/mapped_reference/{reference}.txt"
+  params:
+    "/tmp/map_back_{target}_{reference}"
+  conda: "../envs/pyseer.yaml"
+  log: "out/logs/map_back_{target}_{reference}.log"
+  shell:
+    """
+    mkdir -p {params} && \
+    python workflow/scripts/map_back.py {input.passing} {input.fasta} --tmp-prefix {params} --gff {input.gff} --print-details > {output}
+    """
+
+rule run_map_back_B2_reference:
+  input:
+    passing="out/B2/{target}/unitigs.tsv",
+    fasta=os.path.join(config["references_dir"], "{reference}", "{reference}.fna"),
+    gff=os.path.join(config["references_dir"], "{reference}", "{reference}.gff"),
+  output:
+    "out/B2/{target}/mapped_reference/{reference}.txt"
+  params:
+    "/tmp/map_back_B2_{target}_{reference}"
+  conda: "../envs/pyseer.yaml"
+  log: "out/logs/map_back_B2_{target}_{reference}.log"
+  shell:
+    """
+    mkdir -p {params} && \
+    python workflow/scripts/map_back.py {input.passing} {input.fasta} --tmp-prefix {params} --gff {input.gff} --print-details > {output}
+    """
+
 rule run_map_back_nc:
   input:
     passing="out/associations/{target}/nc_unitigs_filtered.tsv",
@@ -645,6 +787,18 @@ rule map_summary:
     summary=expand("out/associations/{target}/summary.tsv",
                    target=config["targets"])
 
+rule map_summary_fig:
+  input:
+    mapped=expand("out/associations/{target}/mapped.svg",
+                  target=config["targets"]),
+
+rule map_summary_B2:
+  input:
+    mapped=expand("out/B2/{target}/mapped.tsv",
+                  target=config["targets"]),
+    summary=expand("out/B2/{target}/summary.tsv",
+                   target=config["targets"])
+
 rule map_summary_nc:
   input:
     mapped=expand("out/associations/{target}/nc_mapped.tsv",
@@ -666,6 +820,42 @@ rule run_map_summary:
     """
     echo -e "strain\\tunitig\\tcontig\\tstart\\tend\\tstrand\\tupstream\\tgene\\tdownstream" > {output.mapped}
     cat out/associations/{wildcards.target}/mapped/*.txt >> {output.mapped}
+    python workflow/scripts/mapped_summary.py {output.mapped} \
+           {input.phenotypes} {wildcards.target} {input.filtered} \
+           --pangenome {input.pangenome} \
+           --length 30 --minimum-hits 9 --maximum-genes 10 \
+           --unique \
+           > {output.summary}
+    """
+
+rule run_map_summary_fig:
+  input:
+    config["rerooted"],
+    "out/associations/inputs/lineages.tsv",
+    "out/associations/{target}/mapped.tsv"
+  output:
+    "out/associations/{target}/mapped.svg"
+  log: "out/logs/map_summary_fig_{target}.log"
+  conda: "../envs/pyseer.yaml"
+  shell:
+    """
+    python workflow/scripts/unitigs2fig.py {input} {output}
+    """
+
+rule run_map_summary_B2:
+  input:
+    phenotypes=os.path.join(config["B2_inputs"], "phenotypes.tsv"),
+    filtered="out/B2/{target}/unitigs_filtered.tsv",
+    pangenome=config["pangenome"],
+    mapped="out/B2/mapped.done"
+  output:
+    mapped="out/B2/{target}/mapped.tsv",
+    summary="out/B2/{target}/summary.tsv"
+  log: "out/logs/map_summary_B2_{target}.log"
+  shell:
+    """
+    echo -e "strain\\tunitig\\tcontig\\tstart\\tend\\tstrand\\tupstream\\tgene\\tdownstream" > {output.mapped}
+    cat out/B2/{wildcards.target}/mapped/*.txt >> {output.mapped}
     python workflow/scripts/mapped_summary.py {output.mapped} \
            {input.phenotypes} {wildcards.target} {input.filtered} \
            --pangenome {input.pangenome} \
@@ -726,6 +916,79 @@ rule run_annotate_summary:
                --data_dir {params.emapper_data} || touch {output} && \
     python workflow/scripts/enhance_summary.py {input.summary} {params.annotations} \
     > {output}
+    """
+
+rule annotate_summary_B2:
+  input:
+    expand("out/B2/{target}/annotated_summary.tsv",
+           target=config["targets"])
+
+rule run_annotate_summary_B2:
+  input:
+    summary="out/B2/{target}/summary.tsv",
+    pangenome=config["pangenome_roary"],
+    genes=config["pangenome_genes"]
+  output:
+    "out/B2/{target}/annotated_summary.tsv"
+  params:
+    emapper_data=config["emapper"],
+    emapper_base="out/B2/{target}/summary",
+    sample="out/B2/{target}/sample.faa",
+    annotations="out/B2/{target}/summary.emapper.annotations"
+  threads: 8 
+  conda: "../envs/eggnog-mapper.yaml"
+  log: "out/logs/annotate_B2_{target}.log"
+  shell:
+    """
+    python workflow/scripts/sample_pangenome.py {input.pangenome} {input.genes} \
+           --groups {input.summary} > {params.sample} && \
+    emapper.py -i {params.sample} -o {params.emapper_base} \
+               --cpu {threads} --target_orthologs one2one --go_evidence all \
+               --tax_scope Bacteria --pfam_realign realign --override \
+               --data_dir {params.emapper_data} || touch {output} && \
+    python workflow/scripts/enhance_summary.py {input.summary} {params.annotations} \
+    > {output}
+    """
+
+rule map_references:
+  input:
+    expand("out/associations/{target}/references/{ref}.tsv",
+           target=config["targets"],
+           ref=config["references"])
+
+rule run_map_reference:
+  input:
+    filtered="out/associations/{target}/unitigs_filtered.tsv",
+    pangenome=config["pangenome_ref_roary"]
+  output:
+    "out/associations/{target}/references/{ref}.tsv"
+  params:
+    tmp="/tmp/map_reference_{target}_{ref}",
+    snpeff=config["snpeff"],
+    refs=config["references_dir"]
+  threads: 4
+  log: "out/logs/map_reference_{target}_{ref}.log"
+  conda: "../envs/nucmer.yaml"
+  shell:
+    """
+    tail -n+2 {input.filtered} | awk '{{print ">"$1"\\n"$1}}' \
+         > out/associations/{wildcards.target}/unitigs.fa
+    mkdir -p {params.tmp}
+    nucmer --maxmatch -c 20 -l 15 -L 30 -p {params.tmp}/nucmer \
+           -t {threads} data/references/{wildcards.ref}/{wildcards.ref}.fna \
+           out/associations/{wildcards.target}/unitigs.fa
+    show-snps -T -H {params.tmp}/nucmer.delta > {params.tmp}/nucmer.snps
+    python workflow/scripts/nucmer2vcf.py -s {params.tmp}/nucmer.snps \
+           -g data/references/{wildcards.ref}/{wildcards.ref}.fna --output-header \
+           > {params.tmp}/raw.vcf
+    snpEff ann -noLog -noStats -no-downstream -no-upstream -no-utr \
+           -c {params.snpeff} -dataDir ../{params.refs} {wildcards.ref} \
+           {params.tmp}/raw.vcf > {params.tmp}/annotated.vcf
+    snippy-vcf_to_tab --gff {params.refs}/{wildcards.ref}/genes.gff \
+                      --ref {params.refs}/{wildcards.ref}/{wildcards.ref}.fna \
+                      --vcf {params.tmp}/annotated.vcf > {params.tmp}/annotated.tsv
+    python workflow/scripts/filter_snps.py {input.pangenome} \
+           {params.tmp}/annotated.tsv {wildcards.ref} > {output}
     """
 
 rule simulations:
